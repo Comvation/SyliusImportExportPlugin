@@ -33,6 +33,132 @@ use Sylius\Component\Taxation\Model\TaxCategory;
 use Sylius\Component\Taxation\Repository\TaxCategoryRepositoryInterface;
 use Sylius\Component\Taxonomy\Factory\TaxonFactoryInterface;
 use Sylius\Component\Taxonomy\Repository\TaxonRepositoryInterface;
+//use Sylius\Component\Core\Uploader\ImageUploader;
+use Sylius\Component\Core\Uploader\ImageUploaderInterface;
+
+
+use enshrined\svgSanitize\Sanitizer;
+use Gaufrette\FilesystemInterface;
+use Sylius\Component\Core\Generator\ImagePathGeneratorInterface;
+use Sylius\Component\Core\Generator\UploadedImagePathGenerator;
+use Sylius\Component\Core\Model\ImageInterface;
+use Symfony\Component\HttpFoundation\File\File;
+use Webmozart\Assert\Assert;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
+
+use Symfony\Component\Filesystem\Exception\IOExceptionInterface;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Filesystem\Path;
+
+
+class ImageUploader implements ImageUploaderInterface
+{
+    private const MIME_SVG_XML = 'image/svg+xml';
+
+    private const MIME_SVG = 'image/svg';
+
+    /** @var Sanitizer */
+    protected $sanitizer;
+    protected $filesystem;
+    
+    public function __construct(
+        /* protected ?FilesystemInterface $filesystem= null, */
+        protected ?ImagePathGeneratorInterface $imagePathGenerator = null,
+    ) {
+        if ($imagePathGenerator === null) {
+            @trigger_error(sprintf(
+                'Not passing an $imagePathGenerator to %s constructor is deprecated since Sylius 1.6 and will be not possible in Sylius 2.0.',
+                self::class,
+            ), \E_USER_DEPRECATED);
+        }
+
+        $this->imagePathGenerator = $imagePathGenerator ?? new UploadedImagePathGenerator();
+        $this->sanitizer = new Sanitizer();
+        $this->filesystem = new Filesystem();
+		
+		
+    }
+	
+    public function upload(ImageInterface $image): void
+    {
+		
+		
+        if (!$image->hasFile()) {
+            return;
+        }
+
+        /** @var File $file */
+        $file = $image->getFile();
+		
+        Assert::isInstanceOf($file, File::class);
+
+        $fileContent = $this->sanitizeContent(file_get_contents($file->getPathname()), $file->getMimeType());
+
+        if (null !== $image->getPath() && $this->has($image->getPath())) {
+           // $this->remove($image->getPath());
+			unlink($image->getPath());
+        }
+
+        do {
+            $path = $this->imagePathGenerator->generate($image);
+            
+			
+        } while ($this->isAdBlockingProne($path) || $this->has($path));
+		
+		$root =  $_SERVER['DOCUMENT_ROOT'];
+		
+		//$newpath = Path::makeAbsolute($path,'/media/image/');
+		$newpath = $root.'/media/image/'.$path;
+		$dirname = dirname($newpath);
+		if (!is_dir($dirname))
+		{
+				$this->filesystem->mkdir($dirname);
+		}
+		$image->setPath($path);
+		$myfile = fopen($newpath, "w");
+		fwrite($myfile, $fileContent);
+		
+		fclose($myfile);
+		
+        //move_uploaded_file($image->getPath(), $fileContent);
+        //$this->filesystem->copy($path,$image->getPath());
+        //$this->filesystem->touch($image->getPath(), $fileContent);
+    }
+
+    public function remove(string $path): bool
+    {
+        if ($this->has($path)) {
+            return $this->filesystem->remove($path);
+        }
+
+        return false;
+    }
+
+    protected function sanitizeContent(string $fileContent, string $mimeType): string
+    {
+        if (self::MIME_SVG_XML === $mimeType || self::MIME_SVG === $mimeType) {
+            $fileContent = $this->sanitizer->sanitize($fileContent);
+        }
+
+        return $fileContent;
+    }
+
+    private function has(string $path): bool
+    {
+		
+        return $this->filesystem->exists($path);
+    }
+
+    /**
+     * Will return true if the path is prone to be blocked by ad blockers
+     */
+    private function isAdBlockingProne(string $path): bool
+    {
+        return str_contains($path, 'ad');
+    }
+}
+
+
 
 final class ProductProcessor implements ResourceProcessorInterface
 {
@@ -87,6 +213,7 @@ final class ProductProcessor implements ResourceProcessorInterface
     /** @var RepositoryInterface */
     private $productOptionValueRepository;
     private TaxCategoryRepositoryInterface $taxCategoryRepository;
+    
 
     public function __construct(
         ProductFactoryInterface $productFactory,
@@ -111,8 +238,11 @@ final class ProductProcessor implements ResourceProcessorInterface
         ?TransformerPoolInterface $transformerPool,
         TaxCategoryRepositoryInterface $taxCategoryRepository,
         EntityManagerInterface $manager,
-        array $headerKeys
+        array $headerKeys,
+       
+		
     ) {
+		
         $this->resourceProductFactory = $productFactory;
         $this->resourceTaxonFactory = $taxonFactory;
         $this->productRepository = $productRepository;
@@ -136,6 +266,8 @@ final class ProductProcessor implements ResourceProcessorInterface
         $this->channelPricingFactory = $channelPricingFactory;
         $this->channelPricingRepository = $channelPricingRepository;
         $this->taxCategoryRepository = $taxCategoryRepository;
+        $this->taxCategoryRepository = $taxCategoryRepository;
+        
     }
 
     /**
@@ -536,12 +668,18 @@ final class ProductProcessor implements ResourceProcessorInterface
             } else {
                 $productImage = $productImageByType->first();
             }
+			$imagePath = $data[ImageTypesProvider::IMAGES_PREFIX . $imageType];
+			//$imagePath = "https://images.pexels.com/photos/2891250/pexels-photo-2891250.jpeg";
+			$uploadedImage = new UploadedFile($imagePath, basename($imagePath));
 
+            /** @var ImageInterface $productImage */
+           
+            $productImage->setFile($uploadedImage);
             $productImage->setType($imageType);
-            $productImage->setPath(
-                $data[ImageTypesProvider::IMAGES_PREFIX . $imageType]
-            );
-            $product->addImage($productImage);
+			$a = new ImageUploader();
+			$a->upload($productImage);
+			
+			$product->addImage($productImage);
         }
 
         // create image if import has new one
@@ -559,11 +697,20 @@ final class ProductProcessor implements ResourceProcessorInterface
 
             /** @var ProductImageInterface $productImage */
             $productImage = $this->productImageFactory->createNew();
+            //$imagePath = "https://images.pexels.com/photos/2891250/pexels-photo-2891250.jpeg";
+			$imagePath = $data[ImageTypesProvider::IMAGES_PREFIX . $imageType];
+			$uploadedImage = new UploadedFile($imagePath, basename($imagePath));
+
+            /** @var ImageInterface $productImage */
+           
+            $productImage->setFile($uploadedImage);
             $productImage->setType($imageType);
-            $productImage->setPath(
-                $data[ImageTypesProvider::IMAGES_PREFIX . $imageType]
-            );
-            $product->addImage($productImage);
+			$a = new ImageUploader();
+			$a->upload($productImage);
+			
+			$product->addImage($productImage);
+        
         }
     }
+	
 }

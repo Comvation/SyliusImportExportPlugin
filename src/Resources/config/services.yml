@@ -1,5 +1,19 @@
+# parameters:
+    # acme.classes.bar.class:
+        # public: true
+        # class: Sylius\Component\Core\Uploader\ImageUploader
+        # arguments:
+            # - Gaufrette\FilesystemInterface
+    
 services:
     # Parameter Bag
+    
+    acme.classes.bar.class:
+        public: true
+        class: Gaufrette\FilesystemInterface
+        
+            
+            
     sylius.parameter_bag:
         class: FriendsOfSylius\SyliusImportExportPlugin\DependencyInjection\ParameterBag\ParameterBag
         arguments:
@@ -351,6 +365,7 @@ services:
             - "@sylius.repository.tax_category"
             - "@doctrine.orm.entity_manager"
             - ['Code', 'Locale', 'Name', 'Description', 'Short_description', 'Meta_description', 'Meta_keywords', 'Main_taxon', 'Taxons', 'Channels', 'Enabled', 'Price']
+            # - '@acme.classes.bar.class'
 
     sylius.class_metadata.product_image:
         class: Doctrine\ORM\Mapping\ClassMetadata
