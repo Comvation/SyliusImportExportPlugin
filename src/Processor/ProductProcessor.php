@@ -668,7 +668,14 @@ final class ProductProcessor implements ResourceProcessorInterface
             } else {
                 $productImage = $productImageByType->first();
             }
-			$imagePath = $data[ImageTypesProvider::IMAGES_PREFIX . $imageType];
+			
+			$root =  $_SERVER['DOCUMENT_ROOT'];
+		
+			//$newpath = Path::makeAbsolute($path,'/media/image/');
+			$imagePath = $root.'/media/image/'.$data[ImageTypesProvider::IMAGES_PREFIX . $imageType];
+			
+			
+			//$imagePath = $data[ImageTypesProvider::IMAGES_PREFIX . $imageType];
 			//$imagePath = "https://images.pexels.com/photos/2891250/pexels-photo-2891250.jpeg";
 			$uploadedImage = new UploadedFile($imagePath, basename($imagePath));
 
@@ -698,7 +705,12 @@ final class ProductProcessor implements ResourceProcessorInterface
             /** @var ProductImageInterface $productImage */
             $productImage = $this->productImageFactory->createNew();
             //$imagePath = "https://images.pexels.com/photos/2891250/pexels-photo-2891250.jpeg";
-			$imagePath = $data[ImageTypesProvider::IMAGES_PREFIX . $imageType];
+			$root =  $_SERVER['DOCUMENT_ROOT'];
+		
+			//$newpath = Path::makeAbsolute($path,'/media/image/');
+			$imagePath = $root.'/media/image/'.$data[ImageTypesProvider::IMAGES_PREFIX . $imageType];
+			
+			//$imagePath = $data[ImageTypesProvider::IMAGES_PREFIX . $imageType];
 			$uploadedImage = new UploadedFile($imagePath, basename($imagePath));
 
             /** @var ImageInterface $productImage */
