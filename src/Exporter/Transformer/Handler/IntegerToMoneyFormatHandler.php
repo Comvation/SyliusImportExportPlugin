@@ -28,7 +28,13 @@ final class IntegerToMoneyFormatHandler extends Handler
      */
     protected function process($key, $value): ?string
     {
-        return sprintf($this->format, $value / 100);
+		$locale = '';
+		if(isset($GLOBALS['request']) && $GLOBALS['request']) {
+			$locale = $GLOBALS['request']->getLocale();
+		}
+		$fmt = new \NumberFormatter( $locale, \NumberFormatter::CURRENCY );
+		return $fmt->formatCurrency($value/100, "USD");
+        //return sprintf($this->format, $value / 100);
     }
 
     protected function allows($key, $value): bool
