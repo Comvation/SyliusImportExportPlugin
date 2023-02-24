@@ -13,7 +13,29 @@ services:
         class: Gaufrette\FilesystemInterface
         
             
-            
+    sylius.processor.orders:
+        class: FriendsOfSylius\SyliusImportExportPlugin\Processor\OrderProcessor
+        arguments:
+            - "@sylius.factory.order"
+            - "@sylius.factory.order_item"
+            - "@sylius.order_item_quantity_modifier"
+            - "@sylius.manager.order"
+            - "@sylius.repository.channel"
+            - "@sylius.repository.customer"
+            - "@sylius.factory.customer"
+            - "@sylius.repository.product"
+            - "@sylius.repository.country"
+            - '@sylius.repository.payment_method'
+            - '@sylius.repository.shipping_method'
+            - '@sylius.factory.address'
+            - '@sm.factory'
+            - '@sylius.checker.order_shipping_method_selection_requirement'
+            - '@sylius.checker.order_payment_method_selection_requirement'
+            - "@doctrine.orm.entity_manager"
+            - ['Code', 'Locale', 'Name', 'Description', 'Short_description', 'Meta_description', 'Meta_keywords', 'Main_taxon', 'Taxons', 'Channels', 'Enabled', 'Price']
+            # - '@acme.classes.bar.class'
+
+       
     sylius.parameter_bag:
         class: FriendsOfSylius\SyliusImportExportPlugin\DependencyInjection\ParameterBag\ParameterBag
         arguments:
