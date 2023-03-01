@@ -16,6 +16,7 @@ services:
     sylius.processor.orders:
         class: FriendsOfSylius\SyliusImportExportPlugin\Processor\OrderProcessor
         arguments:
+            - '@sylius.factory.shop_user'
             - "@sylius.factory.order"
             - "@sylius.factory.order_item"
             - "@sylius.order_item_quantity_modifier"
@@ -24,10 +25,12 @@ services:
             - "@sylius.repository.customer"
             - "@sylius.factory.customer"
             - "@sylius.repository.product"
+            - "@sylius.repository.order"
             - "@sylius.repository.country"
             - '@sylius.repository.payment_method'
             - '@sylius.repository.shipping_method'
             - '@sylius.factory.address'
+            
             - '@sm.factory'
             - '@sylius.checker.order_shipping_method_selection_requirement'
             - '@sylius.checker.order_payment_method_selection_requirement'
