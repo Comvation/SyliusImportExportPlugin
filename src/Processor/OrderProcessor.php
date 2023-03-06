@@ -143,16 +143,16 @@ class OrderProcessor implements ResourceProcessorInterface
 	public function process(array $data): void
     {
 		
-		$this->setDatetime( new \DateTime('@'.strtotime($data['Checkout_completed_at'])));
-		//$this->setDatetime( \DateTime::createFromInterface($data['Checkout_completed_at']));
-		$channel = $this->channelRepository->findOneByCode('default');
+		$this->setDatetime( new \DateTime('@'.strtotime($data['checkout_completed_at'])));
+		//$this->setDatetime( \DateTime::createFromInterface($data['checkout_completed_at']));
+		$channel = $this->channelRepository->findOneByCode($data['channel_code']);
 		$currencyCode = $channel->getBaseCurrency()->getCode();
 		$localeCode = $channel->getLocales()->toArray()[0]->getCode();
 		
 		/********* check customer or create customer with user login details ***/
 		$customer = $this->createOrProvideCustomer($data);
 		
-		$order = $this->orderRepository->findOneBy(['number' => $data['Number']]);
+		$order = $this->orderRepository->findOneBy(['number' => $data['number']]);
 		
 		
 		if (null === $order) {
@@ -169,16 +169,18 @@ class OrderProcessor implements ResourceProcessorInterface
         $order->setCustomer($customer);
         $order->setCurrencyCode($currencyCode);
         $order->setLocaleCode($localeCode);
-		$order->setNumber($data['Number']);
+		$order->setNumber($data['number']);
 		
 		/****** add items to order *********/
 		
-		$this->generateItems($order);
+		$this->generateItems($order,$data);
 		/*************/
 		
 		/*** Address ********/
 		$this->address($order, $customer,$data);
 		/*********/
+		
+		
 		
 		
 		$this->selectShipping($order, $this->datetime);
@@ -187,7 +189,8 @@ class OrderProcessor implements ResourceProcessorInterface
 		
         $this->completeCheckout($order,$data);
 		$this->setOrderCompletedDate($order, $this->datetime);
-		if ($data['State']=='fullfilled') {
+		if ($data['state']=='fulfilled') {
+			
             $this->fulfillOrder($order);
         }
 		
@@ -220,8 +223,8 @@ class OrderProcessor implements ResourceProcessorInterface
 		$this->orderRepository->add($order);
         echo '<pre>';
 		print_r($customer);
-		exit; */
-		exit;
+		exit; 
+		exit;*/
 		
     }
 	
@@ -319,8 +322,8 @@ class OrderProcessor implements ResourceProcessorInterface
     {
 		
 		
-        if ($data['Notes']) {
-            $order->setNotes($data['Notes']);
+        if ($data['notes']) {
+            $order->setNotes($data['notes']);
         }
 		
         $this->applyCheckoutStateTransition($order, OrderCheckoutTransitions::TRANSITION_COMPLETE);
@@ -356,27 +359,38 @@ class OrderProcessor implements ResourceProcessorInterface
         $this->stateMachineFactory->get($order, OrderCheckoutTransitions::GRAPH)->apply($transition);
     }
 	
-	private function generateItems(OrderInterface $order):void{
+	private function generateItems(OrderInterface $order,array $data):void{
 		$generatedItems = [];
 		
-		$product =  $this->productRepository->findOneByCode('B2039');
+		$product_list = $data['product_list'] ? $data['product_list'] : '';
 		
-		//$product = $this->faker->randomElement($products);
-        $variant = $this->faker->randomElement($product->getVariants()->toArray());
-		/** @var OrderItemInterface $item */
-		$item = $this->orderItemFactory->createNew();
+		$product_list_array  = explode(',',$product_list);
+		
+		foreach($product_list_array as $k=>$v){
+			
+			if(!empty($v)){
+				$product =  $this->productRepository->findOneByCode($v);
+				
+				if($product){
+					//$product = $this->faker->randomElement($products);
+					$variant = $this->faker->randomElement($product->getVariants()->toArray());
+					/** @var OrderItemInterface $item */
+					$item = $this->orderItemFactory->createNew();
 
-		$item->setVariant($variant);
-		$this->orderItemQuantityModifier->modify($item, 1);
+					$item->setVariant($variant);
+					$this->orderItemQuantityModifier->modify($item, 1);
 
-		$generatedItems['B2039'] = $item;
-		$order->addItem($item);
+					$generatedItems[$v] = $item;
+					$order->addItem($item);
+				}
+			}
+		}
 	}
 	
 	private function createOrProvideCustomer(array $data): CustomerInterface
     {
         /** @var CustomerInterface|null $customer */
-        $customer = $this->customerRepository->findOneBy(['email' => $data['Email']]);
+        $customer = $this->customerRepository->findOneBy(['email' => $data['email']]);
 		
         return $customer ?? $this->createCustomer($data);
        
@@ -384,23 +398,23 @@ class OrderProcessor implements ResourceProcessorInterface
 	
 	private function address(OrderInterface $order,CustomerInterface $customer, array $data):void{
 		$address = $this->addressFactory->createNew();
-        $address->setCountryCode($data['ShippingCountry']);
-        $address->setCity($data['ShippingCity']);
+        $address->setCountryCode($data['shipping_country']);
+        $address->setCity($data['shipping_city']);
         //$address->setState($data['ShippingState']);
         $address->setFirstName($customer->getFirstName());
         $address->setLastName($customer->getLastName());
-        $address->setStreet($data['ShippingAddressLine1']);
-        $address->setPostcode($data['ShippingZip']);
+        $address->setStreet($data['shipping_address_line1']);
+        $address->setPostcode($data['shipping_zip']);
 		
 		
 		$baddress = $this->addressFactory->createNew();
-        $baddress->setCountryCode($data['BillingCountry']);
-        $baddress->setCity($data['BillingCity']);
+        $baddress->setCountryCode($data['billing_country']);
+        $baddress->setCity($data['billing_city']);
         //$address->setState($data['ShippingState']);
         $baddress->setFirstName($customer->getFirstName());
         $baddress->setLastName($customer->getLastName());
-        $baddress->setStreet($data['BillingAddressLine1']);
-        $baddress->setPostcode($data['BillingZip']);
+        $baddress->setStreet($data['billing_address_line1']);
+        $baddress->setPostcode($data['billing_zip']);
 		
 		
 		
@@ -416,27 +430,28 @@ class OrderProcessor implements ResourceProcessorInterface
 
 
         $customer = $this->customerFactory->createNew();
-        $customer->setEmail($data['Email']);
-        $customer->setFirstName($data['Full_name']);
-        $customer->setLastName(".");
-        $customer->setPhoneNumber($data['Telephone']);
+        $customer->setEmail($data['email']);
+        $customer->setFirstName($data['first_name']);
+        $customer->setLastName($data['last_name']);
+        $customer->setPhoneNumber($data['telephone']);
 		
 		
 		$address = $this->addressFactory->createNew();
-        $address->setCountryCode($data['ShippingCountry']);
-        $address->setCity($data['ShippingCity']);
+        $address->setCountryCode($data['shipping_country']);
+        $address->setCity($data['shipping_city']);
         //$address->setState($data['ShippingState']);
         $address->setFirstName($customer->getFirstName());
         $address->setLastName($customer->getLastName());
-        $address->setStreet($data['ShippingAddressLine1']);
-        $address->setPostcode($data['ShippingZip']);
+        $address->setStreet($data['shipping_address_line1']);
+        $address->setPostcode($data['shipping_zip']);
         $customer->setDefaultAddress($address);
 		
 		
 		
-		$user->setUsername($data['Email']);
-        $user->setPlainPassword('password');
+		$user->setUsername($data['email']);
+        $user->setPlainPassword($data['password']);
         $user->setEnabled(true);
+		$user->setVerifiedAt(new \DateTime());
         
 
         $customer->setUser($user);
