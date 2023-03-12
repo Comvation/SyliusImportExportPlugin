@@ -183,8 +183,8 @@ class OrderProcessor implements ResourceProcessorInterface
 		
 		
 		
-		$this->selectShipping($order, $this->datetime);
-        $this->selectPayment($order, $this->datetime);
+		$this->selectShipping($order, $this->datetime,$data);
+        $this->selectPayment($order, $this->datetime,$data);
 		
 		
         $this->completeCheckout($order,$data);
@@ -230,7 +230,7 @@ class OrderProcessor implements ResourceProcessorInterface
 	
 	
 	
-	protected function selectShipping(OrderInterface $order, \DateTimeInterface $createdAt): void
+	protected function selectShipping(OrderInterface $order, \DateTimeInterface $createdAt,array $data): void
     {
 		
 		
@@ -240,17 +240,25 @@ class OrderProcessor implements ResourceProcessorInterface
         }
 
         $channel = $order->getChannel();
-        $shippingMethods = $this->shippingMethodRepository->findEnabledForChannel($channel);
+       /*  $shippingMethods = $this->shippingMethodRepository->findEnabledForChannel($channel);
 
         if (count($shippingMethods) === 0) {
             throw new \InvalidArgumentException(sprintf(
                 'You have no shipping method available for the channel with code "%s", but they are required to proceed an order',
                 $channel->getCode(),
             ));
-        }
+        } */
 
-        $shippingMethod = $this->faker->randomElement($shippingMethods);
-
+        //$shippingMethod = $this->faker->randomElement($shippingMethods);
+		
+		/* $paymentMethod = $this->paymentMethodRepository->findOneBy([
+            'code' => 'wire-transfer',
+        ]);*/ 
+		$shippingMethod = $this->shippingMethodRepository->findOneBy([
+            'code' => $data['shipping_method_code'],
+        ]);
+		
+		
         /** @var ChannelInterface $channel */
         $channel = $order->getChannel();
         Assert::notNull($shippingMethod, $this->generateInvalidSkipMessage('shipping', $channel->getCode()));
@@ -264,7 +272,7 @@ class OrderProcessor implements ResourceProcessorInterface
         
     }
 
-    protected function selectPayment(OrderInterface $order, \DateTimeInterface $createdAt): void
+    protected function selectPayment(OrderInterface $order, \DateTimeInterface $createdAt,array $data): void
     {
 		
 		$order->setCheckoutState(OrderCheckoutStates::STATE_PAYMENT_SELECTED);
@@ -272,11 +280,20 @@ class OrderProcessor implements ResourceProcessorInterface
             return;
         }
 
-        $paymentMethod = $this
+       /*  $paymentMethod = $this
             ->faker
             ->randomElement($this->paymentMethodRepository->findEnabledForChannel($order->getChannel()))
         ;
-
+		 */
+		
+		$paymentMethod = $this->paymentMethodRepository->findOneBy([
+            'code' =>  $data['payment_method_code'],
+        ]); 
+		/* $shippingMethod = $this->shippingMethodRepository->findOneBy([
+            'code' => $data['shipping_method_code'],
+        ]);*/
+		
+		
         /** @var ChannelInterface $channel */
         $channel = $order->getChannel();
         Assert::notNull($paymentMethod, $this->generateInvalidSkipMessage('payment', $channel->getCode()));
